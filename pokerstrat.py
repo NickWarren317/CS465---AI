@@ -222,16 +222,56 @@ class nickwarren(Strategy):
     '32o': [-0.35, 29.23,	6.12,	0.90,	100.00]
 
 }
+  max_blind = 20
+  class Card:
+    RANKS=['2','3','4','5','6','7','8','9','10','J', 'Q', 'K', 'A']
+
+    SUITS=['h', 'c', 's', 'd']
+
+    def __init__(self,rank, suit):
+
+      self.rank=rank
+      self.suit=suit
+      self.value=(nickwarren.Card.RANKS.index(self.rank)+1)
+
+    def __str__(self):
+        return str(self.rank)+str(self.suit)
+
+
+    def __eq__(self, other):
+      return self.rank == other.rank and self.suit == other.suit
+    
+
+  def simulate(self, player_cards, table_cards):
+    sim_deck = self.deck.copy()
+    random.shuffle(sim_deck)
+    #deal random cards to player
+    for i in range(1,len(player_cards)):
+      player_cards[i][0] = sim_deck[0]
+      sim_deck.pop(0)
+      player_cards[i][1] = sim_deck[0]
+      sim_deck.pop(0)
+
+
+    #deal community cards
+    while(len(table_cards) < 5):
+      table_cards.append(sim_deck.pop(0))
+
+    #get initial
+    hand_rating = pokerhands.evaluate_hand(table_cards + player_cards[0])
+
+    #determine if we have high hand in sim game
+    for i in range(1,len(player_cards)):
+      if hand_rating < pokerhands.evaluate_hand(table_cards + player_cards[i]): return False
+    return True
   
+
   def decide_play(self, player, pot):
     hand_value, rep, tie_break, raw_data=player.get_value()
     raw_values, flush_score, straight, gappers=raw_data
     raw_values.sort()
 
-    #key=((range(0,19)), (range(20,39)), (range(40,59)), (range(60,79)), (range(80,99)), (range(100,149)), (range(150,199)), (range(200, 399)), (range(400, 1000)))
-    choice=1
-
-
+    
     print("Hand Value: ", hand_value)
     print("Rep: ", rep)
     print("Tie break",tie_break)
@@ -239,43 +279,53 @@ class nickwarren(Strategy):
     print(raw_data)
 
     cards_dealt = len(player.total_cards)
+    #initalize deck
+    self.deck = [nickwarren.Card(rank,suit) for rank in
+                 ['2','3','4','5','6','7','8','9','10','J','Q','K','A'] for suit in
+                 ['h','d','c','s']]
+    t_cards = [nickwarren.Card(card.rank, card.suit) for card in player.total_cards if card not in player.cards]
+    my_cards = [nickwarren.Card(card.rank, card.suit) for card in player.cards]
 
-    min_bet, max_bet = self.calc_bet_range(player,pot)
-    if(cards_dealt == 2):
-      expected_v, win_rate, tie_rate = self.get_stats(player,pot)
-      max_bet_ev = int(expected_v * max_bet)
-      print('Win Odds: ', win_rate)
-      if(win_rate > 40): choice = 1
-      if(win_rate < 40 and player.to_play > 0 and not player.all_in): choice = 0
-      if(player.to_play >= player.stack - player.in_pot and win_rate < 80 and not player.all_in): choice = 0
+    self.deck = [deck_card for deck_card in self.deck if deck_card not in t_cards + my_cards]
 
-    elif(cards_dealt == 5):
-      if(win_rate > 50): choice = 1
-      if(win_rate < 40 and player.to_play > 0 and cards_dealt > 2 and not player.all_in): choice = 0
-      if(player.to_play >= player.stack - player.in_pot and hand_value < 600 and not player.all_in): choice = 0
+    #append current hand
+    p_cards = [my_cards]
 
-    elif(cards_dealt == 6):
-      if(win_rate > 50): choice = 1
-      if(win_rate < 40 and player.to_play > 0 and cards_dealt > 2 and not player.all_in): choice = 0
-      if(player.to_play >= player.stack - player.in_pot and hand_value < 600 and not player.all_in): choice = 0
+    #placeholder cards for other players
+    for i in range(0,len(pot.active_players) - 1):
+      p_cards.append([self.Card('2','d'), self.Card('2','d')])
 
-    elif(cards_dealt == 7):
-      if(win_rate > 50): choice = 1
-      if(win_rate < 40 and player.to_play > 0 and cards_dealt > 2 and not player.all_in): choice = 0
-      if(player.to_play >= player.stack - player.in_pot and hand_value < 600 and not player.all_in): choice = 0
+    #simulate possible hands against current hand
+    win_rate=0
+    n = 500
+    for i in range(0,n): 
+      if self.simulate(p_cards.copy(),t_cards.copy()): win_rate+= 1
+    win_rate = win_rate / n
+    print(f'Win Rate: {win_rate}')
+    given_odds = (1/win_rate) - 1
+    print(f'Odds: {given_odds}')
 
-    if choice==0: #fold
-      player.fold(pot)
-    elif choice==1: #call or raise
-      if player.stack<=player.to_play:
-        player.check_call(pot)
-      else:
-        player.bet(pot, max_bet_ev)
-    elif choice==2: #all in
-      if player.stack<=player.to_play:
-        player.check_call(pot)
-      else:
-        player.bet(pot, player.stack)
+    #calc odds of winning
+    #subtract pot from our money in the pot
+
+    #calc odds for the pot
+    #cost to enter pot : total to win in pot
+
+    #if offered odds are more than quadruple ours, call
+
+    #when good enough hand, offer only up to our odds of winning?
+    #i.e when our odds of winning are 2:1 e.g 66% win rate. We would bet up to %50 of our stack.
+
+
+    if(cards_dealt == 2): self.pre_flop_strat(player, pot, win_rate)
+    if(cards_dealt == 5): self.flop_strat(player,pot, win_rate)
+    if(cards_dealt == 6): self.turn_strat(player,pot, win_rate)
+    if(cards_dealt == 7): self.river_strat(player, pot, win_rate)
+    #standard rules to determine all in or folding
+    
+    #fold on all in
+    
+
     #print(player.hand)
     #if pair or greater, heuristic is greater
     #calculate using known cards the odds of a hand beating ours. 
@@ -293,6 +343,159 @@ class nickwarren(Strategy):
   
     #store all starting pairs, play game using same rules, record outcome W/L per hand.
     #we dont wanna win game, we want to stay above 1000 and win hands.
+  def pre_flop_strat(self, player, pot, odds):
+    choice = 3
+
+    expected_v, win_rate, tie_rate = self.get_stats(player,pot)
+    min_bet, max_bet = self.calc_bet_range(player,pot)
+
+    print('Win Odds: ', odds)
+    if(odds > .5): choice = 1
+    if(odds < .3 and player.to_play > 0 and not player.all_in): choice = 0
+    if(player.to_play >= player.stack - player.in_pot and odds < .7 and not player.all_in): choice = 0
+
+    #standard rules to determine all in or folding
+    if(choice != 0 and player.to_play > expected_v * player.stack): choice = 1
+    #fold on all in
+    #if(win_rate < 60 and player.to_play >= max_bet and not player.all_in): choice = 0
+    #all in if cannot afford next round
+    if(player.stack <= pot.blinds[1]*2): choice = 2
+
+    if(player.to_play == 2 and choice == 0): choice = 3
+
+    if choice==0: #fold
+      player.fold(pot)
+    elif choice==1: #call
+      if player.stack<=player.to_play or player.raised:
+        player.check_call(pot)
+      else:
+        max_bet_ev = (int(abs(expected_v) * max_bet) // 10) * 10
+        print(max_bet_ev)
+        player.bet(pot, max_bet_ev)
+    elif choice==2: #all in
+      if player.stack<=player.to_play:
+        player.check_call(pot)
+      else:
+        player.bet(pot, player.stack)
+    else:
+      player.check_call(pot)
+    #Use lookup table to make play.
+
+
+
+  def flop_strat(self, player, pot, odds):
+    hand_value, rep, tie_break, raw_data=player.get_value()
+    choice = 1
+
+    expected_v, win_rate, tie_rate = self.get_stats(player,pot)
+    min_bet, max_bet = self.calc_bet_range(player,pot)
+    print(f'Win Odds {odds}')
+    #standard rules to determine all in or folding
+    if(player.to_play > expected_v * player.stack): choice = 1
+    #fold on all in
+    if(win_rate < 60 and player.to_play >= max_bet and not player.all_in): choice = 0
+    #all in if cannot afford next round
+    if(player.stack <= pot.blinds[1]*2): choice = 2
+
+    if(player.to_play == 2 and choice == 0): choice = 3
+
+    if choice==0: #fold
+      player.fold(pot)
+    elif choice==1: #call
+      if player.stack<=player.to_play or player.raised:
+        player.check_call(pot)
+      else:
+        max_bet_ev = (int(abs(expected_v) * max_bet) // 10) * 10
+        print(max_bet_ev)
+        player.bet(pot, max_bet_ev)
+    elif choice==2: #all in
+      if player.stack<=player.to_play:
+        player.check_call(pot)
+      else:
+        player.bet(pot, player.stack)
+    else:
+      player.check_call(pot)
+
+
+
+  def turn_strat(self, player, pot, odds):
+    hand_value, rep, tie_break, raw_data=player.get_value()
+    choice = 1
+
+    expected_v, win_rate, tie_rate = self.get_stats(player,pot)
+    min_bet, max_bet = self.calc_bet_range(player,pot)
+
+    print(f'Win Odds {odds}')
+
+    #standard rules to determine all in or folding
+    if(player.to_play > expected_v * player.stack): choice = 1
+    #fold on all in
+    if(win_rate < 60 and player.to_play >= max_bet and not player.all_in): choice = 0
+    #all in if cannot afford next round
+    if(player.stack <= pot.blinds[1]*2): choice = 2
+
+    if(player.to_play == 0 and choice == 0): choice = 3
+
+    #hand value
+    if choice==0: #fold
+      player.fold(pot)
+    elif choice==1: #call
+      if player.stack<=player.to_play or player.raised:
+        player.check_call(pot)
+      else:
+        max_bet_ev = (int(abs(expected_v) * max_bet) // 10) * 10
+        print(max_bet_ev)
+        player.bet(pot, max_bet_ev)
+    elif choice==2: #all in
+      if player.stack<=player.to_play:
+        player.check_call(pot)
+      else:
+        player.bet(pot, player.stack)
+    else:
+      player.check_call(pot)
+
+
+
+
+  def river_strat(self, player, pot, odds):
+    hand_value, rep, tie_break, raw_data=player.get_value()
+    choice = 1
+
+    expected_v, win_rate, tie_rate = self.get_stats(player,pot)
+    min_bet, max_bet = self.calc_bet_range(player,pot)
+
+    print(f'Win Odds {odds}')
+
+    #standard rules to determine all in or folding
+    if(player.to_play > expected_v * player.stack): choice = 1
+    #fold on all in
+    if(win_rate < 60 and player.to_play >= max_bet and not player.all_in): choice = 0
+    #all in if cannot afford next round
+    if(player.stack <= pot.blinds[1]*2): choice = 2
+
+    if(player.to_play == 2 and choice == 0): choice = 3
+
+    if choice==0: #fold
+      player.fold(pot)
+    elif choice==1: #call
+      if player.stack<=player.to_play or player.raised:
+        player.check_call(pot)
+      else:
+        max_bet_ev = (int(abs(expected_v) * max_bet) // 10) * 10
+        print(max_bet_ev)
+        player.bet(pot, max_bet_ev)
+    elif choice==2: #all in
+      if player.stack<=player.to_play:
+        player.check_call(pot)
+      else:
+        player.bet(pot, player.stack)
+    else:
+      player.check_call(pot)
+
+
+
+
+
   def calc_bet_range(self, player, pot):
     max_bet = player.stack - player.to_play
     min_bet = player.to_play
