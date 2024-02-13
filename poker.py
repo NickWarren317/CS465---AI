@@ -810,9 +810,10 @@ BLINDS=[10,20]
 table=Table()
 
 player1=Hand('Nick', table, 'nickwarren')
-player2=Hand('PhilipR', table, 'Random')
-player3=Hand('PhilipS', table, 'Random')
-player4=Hand('Fillip', table, 'Random')
+player2=Hand('PhilipR', table, 'JTAdams')
+
+
+
 
 
 deck=Deck()
