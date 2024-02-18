@@ -1,3 +1,24 @@
+class Strategy():
+
+  def __init__(self, player):
+    
+    self.tight=0
+    self.aggression=0
+    self.cool=0
+    self.player=player
+    self.name=str(self.__class__.__name__)
+
+
+      
+  @property
+
+  def play_style(self):
+    
+    pass
+
+  def decide_play(self, player, pot):
+    
+    pass
 class newarren(Strategy):
   #found this data online, very fun to format
   #Name | EV |Win %|Tie %|Occur %|Cumlative %
